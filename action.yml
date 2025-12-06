@@ -1,0 +1,120 @@
+name: 'Bark Notification'
+description: 'Send push notifications via Bark with customizable title format'
+author: 'lihuacai168'
+
+branding:
+  icon: 'bell'
+  color: 'orange'
+
+inputs:
+  key:
+    description: 'Bark API Key'
+    required: true
+  host:
+    description: 'Bark server host (default: https://api.day.app)'
+    required: false
+    default: 'https://api.day.app'
+  title:
+    description: 'Notification title'
+    required: false
+    default: 'GitHub Actions Notification'
+  body:
+    description: 'Notification body'
+    required: false
+    default: 'Workflow completed'
+  url:
+    description: 'URL to open when notification is tapped'
+    required: false
+    default: ''
+  sound:
+    description: 'Notification sound'
+    required: false
+    default: ''
+  isArchive:
+    description: 'Whether to save to history (1 for yes)'
+    required: false
+    default: ''
+  automaticallyCopy:
+    description: 'Automatically copy content to clipboard (1 for yes)'
+    required: false
+    default: ''
+  copy:
+    description: 'Content to copy to clipboard'
+    required: false
+    default: ''
+  group:
+    description: 'Notification group'
+    required: false
+    default: ''
+  icon:
+    description: 'Notification icon URL'
+    required: false
+    default: ''
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Send Bark Notification
+      shell: bash
+      run: |
+        # Encode title and body for URL
+        ENCODED_TITLE=$(echo -n "${{ inputs.title }}" | jq -sRr @uri)
+        ENCODED_BODY=$(echo -n "${{ inputs.body }}" | jq -sRr @uri)
+        
+        # Build base URL
+        URL="${{ inputs.host }}/${{ inputs.key }}/${ENCODED_TITLE}/${ENCODED_BODY}"
+        
+        # Add optional parameters
+        PARAMS=""
+        
+        if [ -n "${{ inputs.url }}" ]; then
+          ENCODED_URL=$(echo -n "${{ inputs.url }}" | jq -sRr @uri)
+          PARAMS="${PARAMS}&url=${ENCODED_URL}"
+        fi
+        
+        if [ -n "${{ inputs.sound }}" ]; then
+          PARAMS="${PARAMS}&sound=${{ inputs.sound }}"
+        fi
+        
+        if [ -n "${{ inputs.isArchive }}" ]; then
+          PARAMS="${PARAMS}&isArchive=${{ inputs.isArchive }}"
+        fi
+        
+        if [ -n "${{ inputs.automaticallyCopy }}" ]; then
+          PARAMS="${PARAMS}&automaticallyCopy=${{ inputs.automaticallyCopy }}"
+        fi
+        
+        if [ -n "${{ inputs.copy }}" ]; then
+          ENCODED_COPY=$(echo -n "${{ inputs.copy }}" | jq -sRr @uri)
+          PARAMS="${PARAMS}&copy=${ENCODED_COPY}"
+        fi
+        
+        if [ -n "${{ inputs.group }}" ]; then
+          PARAMS="${PARAMS}&group=${{ inputs.group }}"
+        fi
+        
+        if [ -n "${{ inputs.icon }}" ]; then
+          ENCODED_ICON=$(echo -n "${{ inputs.icon }}" | jq -sRr @uri)
+          PARAMS="${PARAMS}&icon=${ENCODED_ICON}"
+        fi
+        
+        # Remove leading & if params exist
+        if [ -n "$PARAMS" ]; then
+          PARAMS="?${PARAMS#&}"
+        fi
+        
+        # Send notification
+        FULL_URL="${URL}${PARAMS}"
+        echo "Sending Bark notification..."
+        
+        RESPONSE=$(curl -s -X GET "$FULL_URL")
+        echo "Response: $RESPONSE"
+        
+        # Check if successful
+        if echo "$RESPONSE" | grep -q '"code":200'; then
+          echo "✅ Bark notification sent successfully"
+        else
+          echo "❌ Failed to send Bark notification"
+          echo "Response: $RESPONSE"
+        fi
+
